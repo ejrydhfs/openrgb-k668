@@ -6,7 +6,7 @@
 |  made spefically for FL eSports F11 KB     |
 |                                            |
 |  Dmitri Kalinichenko (Dima-Kal) 23/06/2021 |
-\*-----------------------------------------=*/
+\*------------------------------------------*/
 
 #include <cstring>
 #include <chrono>
@@ -46,16 +46,15 @@ static unsigned char tkl_keys_per_key_index[]               = { 0x08, 0x0A, 0x0B
 | Redragon K668WBO-RGB (Sinowealth, VID 0x258A / PID 0x0049, 108 keys)                              |
 |                                                                                                   |
 | Per-key LED indices reverse engineered from the vendor driver (KeyboardDrv.exe, K668WBO-RGB      |
-| V1.6.6).  Each entry is the LED position used inside the 1024-byte per-key colour buffer of the   |
-| direct/USB-write packet; colour triples are interleaved B,G,R at index*3.                         |
+| V1.6.6).  Each entry is the LED position used inside the 126-slot R,G,B frame of the report 0x08  |
+| direct frame (and the Cfg.ini [KEY] "LED index" column, verified 108/108).                        |
 \*-------------------------------------------------------------------------------------------------*/
-static unsigned int k668_keys_per_key_index[]               = {   0,  12,  18,  24,  30,  36,  42,  48,  54,  60,  66,  72,  78,  84,  90,  96,   1,   7,
-                                                                 13,  19,  25,  31,  37,  43,  49,  55,  61,  67,  73,  79,  85,  91,  97, 103, 109, 115,
-                                                                121,   2,   8,  14,  20,  26,  32,  38,  44,  50,  56,  62,  68,  74,  80,  86,  92,  98,
-                                                                104, 110, 116, 122,   3,   9,  15,  21,  27,  33,  39,  45,  51,  57,  63,  69,  81, 105,
-                                                                111, 117,   4,  10,  16,  22,  28,  34,  40,  46,  52,  58,  64,  82,  94, 106, 112, 118,
-                                                                  5,  11,  17,  35,  53,  59,  65,  83,  89,  95, 101, 107, 119, 124, 102, 108, 114, 120 };
-
+/*-------------------------------------------------------------------------------------------------*\
+| Redragon K668WBO-RGB (Sinowealth, VID 0x258A / PID 0x0049, 108 keys).                              |
+|                                                                                                   |
+| The per-key LED index table lives in K668Protocol.h (K668Protocol::LED_INDEX) so the unit test can |
+| check it against the vendor Cfg.ini mapping.                                                      |
+\*-------------------------------------------------------------------------------------------------*/
 static unsigned int keys_tkl_keys_indices_static_command[]  = { 0x0022, 0x0024, 0x0026, 0x0027, 0x0029, 0x002B, 0x002D, 0x002E, 0x002F,
                                                                 0x0030, 0x0031, 0x0032, 0x0037, 0x0039, 0x003B, 0x003C, 0x003E,
                                                                 0x0040, 0x0042, 0x0043, 0x0044, 0x0045, 0x0046, 0x0047, 0x004C, 0x004E,
@@ -103,6 +102,13 @@ SinowealthKeyboardController::SinowealthKeyboardController(hid_device* dev_cmd_h
     k668_layout     = false;
     single_handle   = false;
     k668_direct_mode = false;
+
+    k668_profile_valid = false;
+    k668_rgbtab_valid  = false;
+    memset(k668_profile, 0x00, sizeof(k668_profile));
+    memset(k668_rgbtab, 0x00, sizeof(k668_rgbtab));
+    memset(k668_psd, 0x00, sizeof(k668_psd));
+    memset(k668_keymatrix, 0x00, sizeof(k668_keymatrix));
 }
 
 SinowealthKeyboardController::SinowealthKeyboardController(hid_device* dev_handle, std::string _path, std::string dev_name, bool _k668_layout)
@@ -111,7 +117,7 @@ SinowealthKeyboardController::SinowealthKeyboardController(hid_device* dev_handl
     dev_data        = dev_handle;
     name            = dev_name;
 
-    led_count       = sizeof(k668_keys_per_key_index) / sizeof(*k668_keys_per_key_index);
+    led_count       = K668Protocol::LED_INDEX_COUNT;
 
     current_mode    = MODE_STATIC;
     current_speed   = SPEED_NORMAL;
@@ -121,6 +127,13 @@ SinowealthKeyboardController::SinowealthKeyboardController(hid_device* dev_handl
     k668_layout     = _k668_layout;
     single_handle   = true;
     k668_direct_mode = false;
+
+    k668_profile_valid = false;
+    k668_rgbtab_valid  = false;
+    memset(k668_profile, 0x00, sizeof(k668_profile));
+    memset(k668_rgbtab, 0x00, sizeof(k668_rgbtab));
+    memset(k668_psd, 0x00, sizeof(k668_psd));
+    memset(k668_keymatrix, 0x00, sizeof(k668_keymatrix));
 }
 
 SinowealthKeyboardController::~SinowealthKeyboardController()
@@ -160,7 +173,7 @@ unsigned int SinowealthKeyboardController::GetLEDCount()
 {
     if(k668_layout)
     {
-        return(sizeof(k668_keys_per_key_index) / sizeof(*k668_keys_per_key_index));
+        return(K668Protocol::LED_INDEX_COUNT);
     }
 
     return(sizeof(tkl_keys_per_key_index) / sizeof(*tkl_keys_per_key_index));
@@ -180,18 +193,169 @@ std::string SinowealthKeyboardController::GetSerialString()
 }
 
 /*-------------------------------------------------------------------------------------------------*\
-| Redragon K668WBO-RGB: switch the board into its per-key ("custom") light mode.                    |
+| Vendor-compatible transport.                                                                      |
 |                                                                                                   |
-| On stock firmware the board boots into a hardware light effect.  While such an effect is active    |
-| the firmware repaints the LED buffer itself and simply ignores the host's report 0x08 per-key      |
-| frames.  Writing the vendor profile with light mode 0x15 (MODE_PER_KEY) switches the board to the  |
-| host-driven mode, after which report 0x08 frames are displayed.                                    |
-|                                                                                                   |
-| The profile is read back (report 0x05 cmd 0x83 addr 0xB6 followed by a report 0x06 get) and only   |
-| the light-mode byte is changed, so all of the user's other profile settings are preserved.         |
-| This is a lighting-only configuration write; it never touches report 0x06 opcode 0x04 (SetKey      |
-| Matrix), which stores key codes and would break typing.                                            |
+| SendK668Report mirrors Vendor SendCommand (FUN_00445460): the caller passes a complete feature    |
+| report whose first byte is the report id; the driver retries three times with a 200 ms gap.       |
+| GetK668Report mirrors GetCommand (FUN_004453d0): the report id goes in [0], the response's [1..]   |
+| is returned to the caller.                                                                         |
 \*-------------------------------------------------------------------------------------------------*/
+bool SinowealthKeyboardController::SendK668Report(unsigned char* report, size_t length)
+{
+    for(unsigned int attempt = 0; attempt < 3; attempt++)
+    {
+        if(hid_send_feature_report(dev_data, report, length) != -1)
+        {
+            return true;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+
+    return false;
+}
+
+bool SinowealthKeyboardController::GetK668Report(unsigned char report_id, unsigned char* buffer, size_t length)
+{
+    unsigned char raw[K668_PROFILE_SIZE];
+
+    if(length + 1 > sizeof(raw))
+    {
+        return false;
+    }
+
+    for(unsigned int attempt = 0; attempt < 3; attempt++)
+    {
+        memset(raw, 0x00, sizeof(raw));
+        raw[0] = report_id;
+
+        int result = hid_get_feature_report(dev_data, raw, length + 1);
+
+        if(result >= (int)(length + 1))
+        {
+            memcpy(buffer, raw + 1, length);
+            return true;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+
+    return false;
+}
+
+/*-------------------------------------------------------------------------------------------------*\
+| GetProfile - report 0x05 / opcode 0x83 / addr 0xB6, then read report 0x06.                        |
+| The result is stored as a raw feature report (report id in [0], opcode in [1], addr in [2]) so    |
+| SetProfile can patch only the fields it owns and preserve everything else.                        |
+\*-------------------------------------------------------------------------------------------------*/
+bool SinowealthKeyboardController::GetProfile()
+{
+    if(!k668_layout)
+    {
+        return false;
+    }
+
+    unsigned char request[6];
+    K668Protocol::BuildGetProfileRequest(request);
+
+    if(!SendK668Report(request, sizeof(request)))
+    {
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    for(unsigned int attempt = 0; attempt < 6; attempt++)
+    {
+        memset(k668_profile, 0x00, sizeof(k668_profile));
+        k668_profile[0] = K668Protocol::REPORT_DATA;
+
+        int result = hid_get_feature_report(dev_data, k668_profile, K668_PROFILE_SIZE);
+
+        if((result >= 3) &&
+           (k668_profile[1] == K668Protocol::OP_GET_PROFILE) &&
+           (k668_profile[2] == K668Protocol::ADDR_PROFILE))
+        {
+            return true;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+
+    return false;
+}
+
+/*-------------------------------------------------------------------------------------------------*\
+| GetPsd - report 0x05 / opcode 0x81 / addr 0x00.  Returns the six-byte device/version descriptor.   |
+\*-------------------------------------------------------------------------------------------------*/
+bool SinowealthKeyboardController::ReadFirmwareInfo()
+{
+    if(!k668_layout)
+    {
+        return false;
+    }
+
+    unsigned char request[6];
+    K668Protocol::BuildGetPsdRequest(request);
+
+    if(!SendK668Report(request, sizeof(request)))
+    {
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    unsigned char response[6];
+
+    if(!GetK668Report(K668Protocol::REPORT_CMD, response, sizeof(response)))
+    {
+        return false;
+    }
+
+    memcpy(k668_psd, response, sizeof(k668_psd));
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------*\
+| GetKeyMatrix - report 0x05 / opcode 0x84 / addr 0xD4, read 0x400 bytes. Read-only diagnostics     |
+| used to show which keys are controlled; the matching write is intentionally not implemented.       |
+\*-------------------------------------------------------------------------------------------------*/
+bool SinowealthKeyboardController::GetKeyMatrix()
+{
+    if(!k668_layout)
+    {
+        return false;
+    }
+
+    unsigned char request[6];
+    K668Protocol::BuildGetKeyMatrixRequest(request);
+
+    if(!SendK668Report(request, sizeof(request)))
+    {
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    return GetK668Report(K668Protocol::REPORT_DATA, k668_keymatrix, sizeof(k668_keymatrix));
+}
+
+void SinowealthKeyboardController::CacheK668Profile()
+{
+    if(GetProfile())
+    {
+        k668_profile_valid = true;
+        return;
+    }
+
+    memset(k668_profile, 0x00, sizeof(k668_profile));
+    k668_profile[0x00] = K668Protocol::REPORT_DATA;
+    k668_profile[0x01] = K668Protocol::OP_SET_PROFILE;
+    k668_profile[0x02] = K668Protocol::ADDR_PROFILE;
+    k668_profile[0x14] = 0x01;
+    k668_profile_valid = true;
+}
+
 void SinowealthKeyboardController::SetK668DirectMode()
 {
     if(k668_direct_mode)
@@ -199,95 +363,70 @@ void SinowealthKeyboardController::SetK668DirectMode()
         return;
     }
 
-    const int buffer_size = 1032;
-
-    unsigned char profile[buffer_size];
-    memset(profile, 0x00, sizeof(profile));
-
-    /*-----------------------------------------------------*\
-    | Ask the board for its current profile                 |
-    \*-----------------------------------------------------*/
-    unsigned char cmd[6] = { 0x05, 0x83, 0xB6, 0x00, 0x00, 0x00 };
-    hid_send_feature_report(dev_data, cmd, sizeof(cmd));
-
-    profile[0] = 0x06;
-    int result = -1;
-
-    for(unsigned int attempt = 0; attempt < 6; attempt++)
+    if(!k668_profile_valid)
     {
-        result = hid_get_feature_report(dev_data, profile, buffer_size);
-
-        if((result >= 3) && (profile[1] == 0x83) && (profile[2] == 0xB6))
-        {
-            break;
-        }
-
-        memset(profile, 0x00, sizeof(profile));
-        profile[0] = 0x06;
-        result = -1;
+        CacheK668Profile();
     }
 
-    if(result < 3)
+    unsigned char profile[K668_PROFILE_SIZE];
+    K668Protocol::BuildSetProfileMode(profile, k668_profile, MODE_PER_KEY);
+
+    SendK668Report(profile, sizeof(profile));
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    current_mode     = MODE_PER_KEY;
+    k668_direct_mode = true;
+}
+
+/*-------------------------------------------------------------------------------------------------*\
+| Build the 20-effect palette cache and send it with SetLedRgbTab (report 0x06 / opcode 0x08 / addr |
+| 0xB8).  The vendor sends the whole palette; the first fixed-colour request seeds every effect so   |
+| that switching effects never selects an all-black palette.                                        |
+\*-------------------------------------------------------------------------------------------------*/
+void SinowealthKeyboardController::SetK668RgbTab(unsigned char mode, RGBColor color)
+{
+    unsigned int effect = mode - 1;
+
+    if(effect >= K668Protocol::RGBTAB_EFFECTS)
     {
-        /*-------------------------------------------------*\
-        | Could not read the profile back; fall back to the  |
-        | generic Sinowealth profile with the per-key light  |
-        | mode selected.                                     |
-        \*-------------------------------------------------*/
-        memset(profile, 0x00, sizeof(profile));
-        profile[0x00] = 0x06;
-        profile[0x01] = 0x03;
-        profile[0x02] = 0xB6;
-        profile[0x14] = 0x01;
-        profile[0x15] = MODE_PER_KEY;
+        return;
+    }
+
+    unsigned char r = RGBGetRValue(color);
+    unsigned char g = RGBGetGValue(color);
+    unsigned char b = RGBGetBValue(color);
+
+    if(!k668_rgbtab_valid)
+    {
+        for(unsigned int seed = 0; seed < K668Protocol::RGBTAB_EFFECTS; seed++)
+        {
+            K668Protocol::SetPaletteColor(k668_rgbtab, seed, r, g, b);
+        }
+
+        k668_rgbtab_valid = true;
     }
     else
     {
-        profile[1] = 0x03;
-        profile[0x15] = MODE_PER_KEY;
+        K668Protocol::SetPaletteColor(k668_rgbtab, effect, r, g, b);
     }
 
-    hid_send_feature_report(dev_data, profile, buffer_size);
+    unsigned char packet[K668_PROFILE_SIZE];
+    K668Protocol::BuildRgbTab(packet, k668_rgbtab);
 
-    /*-----------------------------------------------------*\
-    | The firmware applies the mode change from its main    |
-    | loop; give it a moment before the report 0x08 frame   |
-    | is expected to be displayed.                          |
-    \*-----------------------------------------------------*/
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-    k668_direct_mode = true;
+    SendK668Report(packet, sizeof(packet));
 }
 
 void SinowealthKeyboardController::SetLEDsDirect(std::vector<RGBColor> colors)
 {
     if(k668_layout)
     {
-        /*-------------------------------------------------*\
-        | Make sure the board is in its host-driven mode     |
-        \*-------------------------------------------------*/
         SetK668DirectMode();
 
-        /*-------------------------------------------------*\
-        | Redragon K668WBO-RGB LED packet (report 0x08):     |
-        |   [0]      = 0x08                                  |
-        |   [1..3]   = 0x0A 0x7A 0x01                        |
-        |   [4 + n]  = R,G,B triple for LED slot n           |
-        |                                                    |
-        | This is the board's normal LED feature report. It  |
-        | must NOT be confused with the vendor "key matrix"  |
-        | command (report 0x06, opcode 0x04), which stores   |
-        | key codes and will make the keyboard stop typing.  |
-        \*-------------------------------------------------*/
-        unsigned char k668_buf[382];
-        unsigned int  num_keys = sizeof(k668_keys_per_key_index) / sizeof(*k668_keys_per_key_index);
+        unsigned char slots[K668Protocol::LED_SLOTS * 3];
+        memset(slots, 0x00, sizeof(slots));
 
-        memset(k668_buf, 0x00, sizeof(k668_buf));
-
-        k668_buf[0] = 0x08;
-        k668_buf[1] = 0x0A;
-        k668_buf[2] = 0x7A;
-        k668_buf[3] = 0x01;
+        unsigned int num_keys = K668Protocol::LED_INDEX_COUNT;
 
         if(colors.size() < num_keys)
         {
@@ -296,14 +435,17 @@ void SinowealthKeyboardController::SetLEDsDirect(std::vector<RGBColor> colors)
 
         for(unsigned int i = 0; i < num_keys; i++)
         {
-            unsigned int base = 4 + (k668_keys_per_key_index[i] * 3);
-
-            k668_buf[base + 0] = RGBGetRValue(colors[i]);
-            k668_buf[base + 1] = RGBGetGValue(colors[i]);
-            k668_buf[base + 2] = RGBGetBValue(colors[i]);
+            K668Protocol::SetLedSlot(slots,
+                                     K668Protocol::LED_INDEX[i],
+                                     RGBGetRValue(colors[i]),
+                                     RGBGetGValue(colors[i]),
+                                     RGBGetBValue(colors[i]));
         }
 
-        hid_send_feature_report(dev_data, k668_buf, sizeof(k668_buf));
+        unsigned char frame[K668Protocol::LED_FRAME_SIZE];
+        K668Protocol::BuildLedFrame(frame, slots);
+
+        SendK668Report(frame, sizeof(frame));
         return;
     }
 
@@ -352,8 +494,7 @@ void SinowealthKeyboardController::SetStaticColor(RGBColor* color_buf)
 {
     if(k668_layout)
     {
-        std::vector<RGBColor> colors(led_count, color_buf[0]);
-        SetLEDsDirect(colors);
+        SetMode(MODE_STATIC, BRIGHTNESS_FULL, SPEED_NORMAL, MODE_COLORS_MODE_SPECIFIC, color_buf[0]);
         return;
     }
 
@@ -389,10 +530,57 @@ void SinowealthKeyboardController::SetStaticColor(RGBColor* color_buf)
     hid_send_feature_report(dev_data, usb_buf, sizeof(usb_buf));
 }
 
-void SinowealthKeyboardController::SetMode(unsigned char mode, unsigned char brightness, unsigned char speed, unsigned char color_mode)
+void SinowealthKeyboardController::SetMode(unsigned char mode, unsigned char brightness, unsigned char speed, unsigned char color_mode, RGBColor k668_color)
 {
     if(k668_layout)
     {
+        if(!k668_profile_valid)
+        {
+            CacheK668Profile();
+        }
+
+        unsigned int speed_level  = speed >> 4;
+        unsigned int bright_level = brightness;
+
+        if(speed_level < 1)
+        {
+            speed_level = 1;
+        }
+        if(speed_level > 4)
+        {
+            speed_level = 4;
+        }
+        if(bright_level > 4)
+        {
+            bright_level = 4;
+        }
+
+        bool fixed_color = (color_mode == MODE_COLORS_MODE_SPECIFIC);
+
+        /*-------------------------------------------------------------------------------------*\
+        | The vendor apply path (KeyboardDrv.exe FUN_0040d4e0) writes the effect palette before |
+        | the profile, so do the same: SetLedRgbTab first, then SetProfile.                     |
+        \*-------------------------------------------------------------------------------------*/
+        if(fixed_color)
+        {
+            SetK668RgbTab(mode, k668_color);
+        }
+
+        unsigned char profile[K668_PROFILE_SIZE];
+        K668Protocol::BuildSetProfile(profile,
+                                      k668_profile,
+                                      mode,
+                                      fixed_color,
+                                      (unsigned char)speed_level,
+                                      (unsigned char)bright_level);
+
+        SendK668Report(profile, sizeof(profile));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+        current_mode     = mode;
+        current_speed    = speed;
+        k668_direct_mode = false;
         return;
     }
 

@@ -120,40 +120,49 @@ static const char *led_names_tkl[] =
 
 /*---------------------------------------------------------------------*\
 | Redragon K668WBO-RGB (VID 0x258A / PID 0x0049) - 108 key full size    |
-| LED order matches k668_keys_per_key_index in the controller           |
+|                                                                       |
+| LED order matches K668Protocol::LED_INDEX in the controller.  Names   |
+| use the standard KEY_EN_* constants so the Qt DeviceView renders the  |
+| keycap keyboard map (it widens Tab/Caps/Shift/Backspace/Enter/Space/  |
+| numpad keys by name).                                                 |
 \*---------------------------------------------------------------------*/
 #define NA_ 0xFFFFFFFF
 
 static const char* k668_led_names[108] =
 {
-    "Esc", "F1", "F2", "F3", "F4", "F5",
-    "F6", "F7", "F8", "F9", "F10", "F11",
-    "F12", "PrtSc", "SrcLock", "Pause", "`", "1",
-    "2", "3", "4", "5", "6", "7",
-    "8", "9", "0", "-", "=", "Backspace",
-    "Insert", "Home", "PgUp", "NumLock", "Num /", "Num*",
-    "Num-", "Tab", "Q", "W", "E", "R",
-    "T", "Y", "U", "I", "O", "P",
-    "[", "]", "\\", "Delete", "End", "PgDn",
-    "Num7", "Num8", "Num9", "Num+", "CapsLock", "A",
-    "S", "D", "F", "G", "H", "J",
-    "K", "L", ";", "'", "Enter", "Num4",
-    "Num5", "Num6", "LShift", "Z", "X", "C",
-    "V", "B", "N", "M", ",", ".",
-    "/", "RShift", "Up", "Num1", "Num2", "Num3",
-    "LCtrl", "LWin", "LAlt", "Space", "RAlt", "FN",
-    "App", "RCtrl", "Left", "Down", "Right", "Num0",
-    "Num .", "Enter", "Mute", "Calc", "Menu", "Media",
+    KEY_EN_ESCAPE, KEY_EN_F1, KEY_EN_F2, KEY_EN_F3, KEY_EN_F4, KEY_EN_F5,
+    KEY_EN_F6, KEY_EN_F7, KEY_EN_F8, KEY_EN_F9, KEY_EN_F10, KEY_EN_F11,
+    KEY_EN_F12, KEY_EN_PRINT_SCREEN, KEY_EN_SCROLL_LOCK, KEY_EN_PAUSE_BREAK, KEY_EN_BACK_TICK, KEY_EN_1,
+    KEY_EN_2, KEY_EN_3, KEY_EN_4, KEY_EN_5, KEY_EN_6, KEY_EN_7,
+    KEY_EN_8, KEY_EN_9, KEY_EN_0, KEY_EN_MINUS, KEY_EN_EQUALS, KEY_EN_BACKSPACE,
+    KEY_EN_INSERT, KEY_EN_HOME, KEY_EN_PAGE_UP, KEY_EN_NUMPAD_LOCK, KEY_EN_NUMPAD_DIVIDE, KEY_EN_NUMPAD_TIMES,
+    KEY_EN_NUMPAD_MINUS, KEY_EN_TAB, KEY_EN_Q, KEY_EN_W, KEY_EN_E, KEY_EN_R,
+    KEY_EN_T, KEY_EN_Y, KEY_EN_U, KEY_EN_I, KEY_EN_O, KEY_EN_P,
+    KEY_EN_LEFT_BRACKET, KEY_EN_RIGHT_BRACKET, KEY_EN_ANSI_BACK_SLASH, KEY_EN_DELETE, KEY_EN_END, KEY_EN_PAGE_DOWN,
+    KEY_EN_NUMPAD_7, KEY_EN_NUMPAD_8, KEY_EN_NUMPAD_9, KEY_EN_NUMPAD_PLUS, KEY_EN_CAPS_LOCK, KEY_EN_A,
+    KEY_EN_S, KEY_EN_D, KEY_EN_F, KEY_EN_G, KEY_EN_H, KEY_EN_J,
+    KEY_EN_K, KEY_EN_L, KEY_EN_SEMICOLON, KEY_EN_QUOTE, KEY_EN_ANSI_ENTER, KEY_EN_NUMPAD_4,
+    KEY_EN_NUMPAD_5, KEY_EN_NUMPAD_6, KEY_EN_LEFT_SHIFT, KEY_EN_Z, KEY_EN_X, KEY_EN_C,
+    KEY_EN_V, KEY_EN_B, KEY_EN_N, KEY_EN_M, KEY_EN_COMMA, KEY_EN_PERIOD,
+    KEY_EN_FORWARD_SLASH, KEY_EN_RIGHT_SHIFT, KEY_EN_UP_ARROW, KEY_EN_NUMPAD_1, KEY_EN_NUMPAD_2, KEY_EN_NUMPAD_3,
+    KEY_EN_LEFT_CONTROL, KEY_EN_LEFT_WINDOWS, KEY_EN_LEFT_ALT, KEY_EN_SPACE, KEY_EN_RIGHT_ALT, KEY_EN_RIGHT_FUNCTION,
+    KEY_EN_MENU, KEY_EN_RIGHT_CONTROL, KEY_EN_LEFT_ARROW, KEY_EN_DOWN_ARROW, KEY_EN_RIGHT_ARROW, KEY_EN_NUMPAD_0,
+    KEY_EN_NUMPAD_PERIOD, KEY_EN_NUMPAD_ENTER, KEY_EN_MEDIA_MUTE, KEY_EN_UNUSED, KEY_EN_MENU, KEY_EN_MEDIA_PLAY_PAUSE,
 };
 
+/*---------------------------------------------------------------------*\
+| Value = index into k668_led_names/leds[] (0..107), NA_ = no key.      |
+| Layout mirrors the physical full-size board; gaps after the named wide |
+| keys let DeviceView widen them into a keycap shape.                   |
+\*---------------------------------------------------------------------*/
 static const unsigned int k668_matrix_map[6][22] =
 {
-    {    0, NA_,   12,   18,   24,   30,   36,   42,   48,   54, NA_,   60,   66,   72,   78,   84,   90,   96,  102,  108,  114,  120 },
-    {    1,    7,   13,   19,   25,   31,   37,   43,   49,   55,   61,   67,   73,   79, NA_,   85,   91,   97,  103,  109,  115,  121 },
-    {    2,    8,   14,   20,   26,   32,   38,   44,   50,   56,   62,   68,   74,   80, NA_,   86,   92,   98,  104,  110,  116,  122 },
-    {    3, NA_,    9,   15,   21,   27,   33,   39,   45,   51,   57,   63,   69,   81, NA_, NA_, NA_, NA_,  105,  111,  117,  124 },
-    {    4, NA_,   10,   16,   22,   28,   34,   40,   46,   52,   58,   64,   82, NA_, NA_, NA_,   94, NA_,  106,  112,  118, NA_ },
-    {    5,   11,   17, NA_,   35, NA_, NA_, NA_, NA_, NA_,   53,   59,   65, NA_,   83,   89,   95,  101,  107, NA_,  119, NA_ },
+    {   0, NA_,   1,   2,   3,   4,   5,   6,   7,   8, NA_,   9,  10,  11,  12,  13,  14,  15, 104, 105, 106, 107 },
+    {  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29, NA_,  30,  31,  32,  33,  34,  35,  36 },
+    {  37, NA_,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,  56,  57 },
+    {  58, NA_,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70, NA_, NA_, NA_, NA_,  71,  72,  73, 103 },
+    {  74, NA_,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85, NA_, NA_, NA_,  86, NA_,  87,  88,  89, NA_ },
+    {  90,  91,  92, NA_,  93, NA_, NA_, NA_, NA_, NA_,  94,  95,  96, NA_,  97,  98,  99, 100, 101, NA_, 102, NA_ },
 };
 
 /**------------------------------------------------------------------*\
@@ -439,25 +448,95 @@ RGBController_SinowealthKeyboard::RGBController_SinowealthKeyboard(SinowealthKey
     Perfect.colors.resize(1);
     modes.push_back(Perfect);
 
-    /*---------------------------------------------------------*\
-    | The K668WBO-RGB only has a verified-safe path for setting  |
-    | individual colours.  Its hardware-effect command is a      |
-    | vendor profile write that has not been validated, so it is |
-    | not offered, leaving Off, Static and per-key (Custom).     |
-    \*---------------------------------------------------------*/
     if(controller->GetK668Layout())
     {
-        std::vector<mode> safe_modes;
+        modes.clear();
 
-        for(mode& current : modes)
+        mode K668Static;
+        K668Static.name       = "Static";
+        K668Static.flags      = MODE_FLAG_HAS_MODE_SPECIFIC_COLOR;
+        K668Static.color_mode = MODE_COLORS_MODE_SPECIFIC;
+        K668Static.value      = MODE_STATIC;
+        K668Static.colors_min = 1;
+        K668Static.colors_max = 1;
+        K668Static.colors.resize(1);
+        modes.push_back(K668Static);
+
+        mode K668Custom;
+        K668Custom.name       = "Custom";
+        K668Custom.flags      = MODE_FLAG_HAS_PER_LED_COLOR;
+        K668Custom.color_mode = MODE_COLORS_PER_LED;
+        K668Custom.value      = MODE_PER_KEY;
+        modes.push_back(K668Custom);
+
+        mode K668Off;
+        K668Off.name       = "Off";
+        K668Off.flags      = 0;
+        K668Off.color_mode = MODE_COLORS_NONE;
+        K668Off.value      = MODE_OFF;
+        modes.push_back(K668Off);
+
+        struct k668_effect_entry
         {
-            if((current.value == MODE_OFF) || (current.value == MODE_STATIC) || (current.value == MODE_PER_KEY))
-            {
-                safe_modes.push_back(current);
-            }
-        }
+            unsigned int value;
+            const char*  name;
+            bool         has_color;
+        };
 
-        modes = safe_modes;
+        /*---------------------------------------------------------------------------------*\
+        | Names and per-effect capabilities come straight from the vendor UI string table    |
+        | (Text/en/text.xml "tc_led_modeN", N = the LedOpt row number / profile mode value). |
+        | has_color mirrors the LedOpt row's "color" flag: rows 3, 6, 15, 16 and 17 are the   |
+        | inherently-multicoloured effects that take neither a fixed nor a random colour.     |
+        | Modes 4 (Flash Away), 7 (Ripples Shining), 9 (Shadow Disappear) and 12 (Reaction)   |
+        | are key-press-triggered transient effects and are deliberately not exposed.         |
+        \*---------------------------------------------------------------------------------*/
+        static const k668_effect_entry k668_effects[] =
+        {
+            { K668_MODE_RESPIRE,           "Respire",           true  },  /* N2  */
+            { K668_MODE_RAINBOW,           "Rainbow",           false },  /* N3  */
+            { K668_MODE_FLASH_AWAY,        "Flash Away",        true  },  /* N4  */
+            { K668_MODE_RAIN_DROPS,        "Rain Drops",        true  },  /* N5  */
+            { K668_MODE_RAINBOW_WHEEL,     "Rainbow Wheel",     false },  /* N6  */
+            { K668_MODE_RIPPLES_SHINING,   "Ripples Shining",   true  },  /* N7  */
+            { K668_MODE_STARS_TWINKLE,     "Stars Twinkle",     true  },  /* N8  */
+            { K668_MODE_SHADOW_DISAPPEAR,  "Shadow Disappear",  true  },  /* N9  */
+            { K668_MODE_RETRO_SNAKE,       "Retro Snake",       true  },  /* N10 */
+            { K668_MODE_NEON_STREAM,       "Neon Stream",       true  },  /* N11 */
+            { K668_MODE_REACTION,          "Reaction",          true  },  /* N12 */
+            { K668_MODE_SINE_WAVE,         "Sine Wave",         true  },  /* N13 */
+            { K668_MODE_RETINUE_SCANNING,  "Retinue Scanning",  true  },  /* N14 */
+            { K668_MODE_ROTATING_WINDMILL, "Rotating Windmill", false },  /* N15 */
+            { K668_MODE_COLORFUL_WATERFALL,"Colorful Waterfall",false },  /* N16 */
+            { K668_MODE_BLOSSOMING,        "Blossoming",        false },  /* N17 */
+            { K668_MODE_ROTATING_STORM,    "Rotating Storm",    true  },  /* N18 */
+        };
+
+        for(const k668_effect_entry& effect : k668_effects)
+        {
+            mode new_mode;
+            new_mode.name           = effect.name;
+            new_mode.flags          = MODE_FLAG_HAS_SPEED | MODE_FLAG_HAS_BRIGHTNESS;
+            new_mode.speed_min      = SPEED_SLOW;
+            new_mode.speed          = SPEED_NORMAL;
+            new_mode.speed_max      = SPEED_FASTEST;
+            new_mode.brightness_min = BRIGHTNESS_OFF;
+            new_mode.brightness     = BRIGHTNESS_FULL;
+            new_mode.brightness_max = BRIGHTNESS_FULL;
+            new_mode.color_mode     = MODE_COLORS_NONE;
+            new_mode.value          = effect.value;
+
+            if(effect.has_color)
+            {
+                new_mode.flags      |= MODE_FLAG_HAS_MODE_SPECIFIC_COLOR | MODE_FLAG_HAS_RANDOM_COLOR;
+                new_mode.color_mode  = MODE_COLORS_RANDOM;
+                new_mode.colors_min  = 1;
+                new_mode.colors_max  = 1;
+                new_mode.colors.resize(1);
+            }
+
+            modes.push_back(new_mode);
+        }
     }
 
     SetupZones();
@@ -552,9 +631,20 @@ void RGBController_SinowealthKeyboard::DeviceUpdateMode()
             std::vector<RGBColor> off_leds(controller->GetLEDCount(), 0x00000000);
             controller->SetLEDsDirect(off_leds);
         }
-        else
+        else if(modes[active_mode].value == MODE_PER_KEY)
         {
             DeviceUpdateLEDs();
+        }
+        else
+        {
+            unsigned int  brightness = modes[active_mode].brightness;
+            RGBColor      color      = (modes[active_mode].color_mode == MODE_COLORS_MODE_SPECIFIC) ? modes[active_mode].colors[0] : 0;
+
+            controller->SetMode(modes[active_mode].value,
+                                brightness,
+                                modes[active_mode].speed,
+                                modes[active_mode].color_mode,
+                                color);
         }
         return;
     }
