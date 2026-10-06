@@ -1,7 +1,7 @@
 ## ![OpenRGB](Documentation/Images/OpenRGB.png "OpenRGB Logo")
 
 
-This is an open RGB fork with support for the redesign k668 keyboard which has a Sinowealth micro controller. other keyboards with microcontrollers from sinowealth might also benefit as this key board seems to be an OEM ODM key board sold on Alibaba by a single factory, that is then customized with one of several brands and material variations. for example you can see the same keyboard design under several brands with different base board materials or keycaps
+This is an open RGB fork with support for the redesign k668 keyboard which has a Sinowealth micro controller. other keyboards with microcontrollers from sinowealth might also benefit as this key board seems to be an OEM ODM key board sold on Alibaba by a single factory, that is then customized with branding and material variations. for example you can see the same keyboard design under several brands with different base board materials or keycaps
 
 ![Pipeline Status](https://gitlab.com/CalcProgrammer1/OpenRGB/badges/master/pipeline.svg)
 
